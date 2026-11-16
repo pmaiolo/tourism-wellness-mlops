@@ -23,7 +23,7 @@ EXPECTED_COLUMNS = [
 TARGET = "ProdTaken"
 
 
-def main() -> None: 
+def main() -> None:
     if not DATA_PATH.exists():
         sys.exit(f"[ERROR] Dataset not found at {DATA_PATH}")
 
