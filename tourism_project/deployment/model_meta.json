@@ -1,8 +1,25 @@
 {
   "model_file": "best_tourism_model_v1.joblib",
-  "decision_threshold": 0.3645285367965698,
+  "feature_set": "pre-contact only",
+  "features": [
+    "Age",
+    "CityTier",
+    "NumberOfPersonVisiting",
+    "PreferredPropertyStar",
+    "NumberOfTrips",
+    "Passport",
+    "OwnCar",
+    "NumberOfChildrenVisiting",
+    "MonthlyIncome",
+    "TypeofContact",
+    "Occupation",
+    "Gender",
+    "MaritalStatus",
+    "Designation"
+  ],
+  "decision_threshold": 0.4750220477581024,
   "best_params": {
-    "colsample_bytree": 0.6,
+    "colsample_bytree": 0.8,
     "learning_rate": 0.1,
     "max_depth": 7,
     "n_estimators": 200,
@@ -10,15 +27,15 @@
     "subsample": 0.8
   },
   "test_metrics": {
-    "test_accuracy": 0.934,
-    "test_precision": 0.8269,
-    "test_recall": 0.8323,
-    "test_f1": 0.8296,
-    "test_roc_auc": 0.9519
+    "test_accuracy": 0.9199,
+    "test_precision": 0.8214,
+    "test_recall": 0.7516,
+    "test_f1": 0.785,
+    "test_roc_auc": 0.9401
   },
   "versions": {
     "scikit-learn": "1.6.1",
     "xgboost": "2.1.4"
   },
-  "mlflow_run_id": "bb12243cc638436397ed05f86c6c4e2d"
+  "mlflow_run_id": "2a3e0b99e708464a80784759c281046c"
 }

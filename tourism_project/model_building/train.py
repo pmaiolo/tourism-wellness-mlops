@@ -3,11 +3,16 @@ Model Training with Experiment Tracking
 ---------------------------------------
 1. Loads the train / test splits produced by the data-prep job (workflow artifact).
 2. Builds a preprocessing + XGBoost pipeline and tunes it with GridSearchCV.
+   Preprocessing (imputation, scaling, one-hot encoding) lives INSIDE the pipeline,
+   so it is fitted on the training folds only - no information from the test set.
 3. Logs every tuned parameter combination (nested runs) and the best model's
    parameters, metrics and artifacts to MLflow.
 4. Picks a decision threshold that maximises F1 on the cross-validated
    training predictions (never on the test set) and evaluates on the test set.
 5. Saves the best model to tourism_project/deployment/ so the workflow can commit it.
+
+Only PRE-CONTACT features are used (see prep.py), because the business goal is
+to score customers before the sales team contacts them.
 """
 import json
 import os
@@ -20,6 +25,7 @@ import pandas as pd
 import sklearn
 import xgboost as xgb
 from sklearn.compose import make_column_transformer
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import (accuracy_score, classification_report, f1_score,
                              precision_recall_curve, precision_score,
                              recall_score, roc_auc_score)
@@ -46,23 +52,31 @@ ytrain = pd.read_csv("ytrain.csv").squeeze("columns")
 ytest = pd.read_csv("ytest.csv").squeeze("columns")
 print(f"Train {Xtrain.shape} | Test {Xtest.shape}")
 
+# Pre-contact features only (post-contact columns were removed in prep.py)
 numeric_features = [
-    "Age", "CityTier", "DurationOfPitch", "NumberOfPersonVisiting",
-    "NumberOfFollowups", "PreferredPropertyStar", "NumberOfTrips", "Passport",
-    "PitchSatisfactionScore", "OwnCar", "NumberOfChildrenVisiting", "MonthlyIncome",
+    "Age", "CityTier", "NumberOfPersonVisiting", "PreferredPropertyStar",
+    "NumberOfTrips", "Passport", "OwnCar", "NumberOfChildrenVisiting", "MonthlyIncome",
 ]
 categorical_features = [
-    "TypeofContact", "Occupation", "Gender", "ProductPitched",
-    "MaritalStatus", "Designation",
+    "TypeofContact", "Occupation", "Gender", "MaritalStatus", "Designation",
 ]
+missing_cols = [c for c in numeric_features + categorical_features if c not in Xtrain.columns]
+assert not missing_cols, f"Missing feature columns: {missing_cols}"
+Xtrain = Xtrain[numeric_features + categorical_features]
+Xtest = Xtest[numeric_features + categorical_features]
 
 # --- Model definition ---------------------------------------------------------
 # Class imbalance (~19% buyers): weight the positive class by the neg/pos ratio.
 scale_pos_weight = float((ytrain == 0).sum() / (ytrain == 1).sum())
 
+numeric_pipe = make_pipeline(SimpleImputer(strategy="median"), StandardScaler())
+categorical_pipe = make_pipeline(
+    SimpleImputer(strategy="most_frequent"),
+    OneHotEncoder(handle_unknown="ignore"),
+)
 preprocessor = make_column_transformer(
-    (StandardScaler(), numeric_features),
-    (OneHotEncoder(handle_unknown="ignore"), categorical_features),
+    (numeric_pipe, numeric_features),
+    (categorical_pipe, categorical_features),
 )
 xgb_model = xgb.XGBClassifier(
     scale_pos_weight=scale_pos_weight,
@@ -95,6 +109,9 @@ def metrics(y_true, y_pred, y_prob, prefix):
 
 
 with mlflow.start_run(run_name="xgb-gridsearch") as parent:
+    mlflow.set_tag("feature_set", "pre-contact only")
+    mlflow.log_param("features", ",".join(numeric_features + categorical_features))
+
     grid = GridSearchCV(model_pipeline, param_grid, cv=cv, scoring="f1",
                         n_jobs=-1, return_train_score=False)
     grid.fit(Xtrain, ytrain)
@@ -129,6 +146,7 @@ with mlflow.start_run(run_name="xgb-gridsearch") as parent:
                    **metrics(ytest, test_pred, test_prob, "test")}
     mlflow.log_metrics(all_metrics)
 
+    print("Features used:", numeric_features + categorical_features)
     print("Best params:", best_params)
     print(f"Best CV F1: {grid.best_score_:.4f} | decision threshold: {threshold:.3f}")
     print("\nTest-set classification report:")
@@ -148,6 +166,8 @@ with mlflow.start_run(run_name="xgb-gridsearch") as parent:
     joblib.dump(best, MODEL_PATH)
     meta = {
         "model_file": MODEL_PATH.name,
+        "feature_set": "pre-contact only",
+        "features": numeric_features + categorical_features,
         "decision_threshold": threshold,
         "best_params": best_params,
         "test_metrics": {k: round(v, 4) for k, v in all_metrics.items() if k.startswith("test")},
