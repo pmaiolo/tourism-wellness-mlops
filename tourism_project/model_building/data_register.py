@@ -2,7 +2,7 @@
 Data Registration
 -----------------
 Reads the raw tourism dataset straight from the repository (tourism_project/data),
-validates that every expected column is present and prints a short summary.
+validates that every expected column is present, and prints a short summary.
 The dataset is versioned inside the GitHub repo, so no external data store is needed.
 Exits with a non-zero code if validation fails, which stops the GitHub Actions pipeline.
 """
@@ -23,7 +23,7 @@ EXPECTED_COLUMNS = [
 TARGET = "ProdTaken"
 
 
-def main() -> None:
+def main() -> None: 
     if not DATA_PATH.exists():
         sys.exit(f"[ERROR] Dataset not found at {DATA_PATH}")
 
@@ -39,7 +39,7 @@ def main() -> None:
     if not set(df[TARGET].unique()).issubset({0, 1}):
         sys.exit(f"[ERROR] Target '{TARGET}' is not binary")
 
-    # 3) Summary
+    # 3) Summary output
     print("=" * 60)
     print("DATASET REGISTERED:", DATA_PATH)
     print("=" * 60)
